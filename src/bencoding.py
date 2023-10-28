@@ -24,10 +24,46 @@ TOKEN_STRING_SEPARATOR = b':'
 
 
 class Decoder:
-    def __init__(self):
+    """
+        Class to manage a bencoded sequence of bytes
+    """
+    def __init__(self, data: bytes):
+        if not isinstance(data, bytes):
+            raise TypeError(
+                "Argument 'data' must be of type 'bytes'")
+        self._data = data
+        self._index = 0
+
+    def _peek(self):
+        """
+            Return the next character from the bencodede data or None
+        """
+        if self._index + 1 >= len(self._data):
+            return None
+        return self._data[self._index:self._index + 1]
+
+    def _consume(self):
+        ...
+
+    def _read(self):
+        ...
+
+    def _read_until(self):
+        ...
+
+    def _decode_int(self):
+        ...
+
+    def _decode_list(self):
+        ...
+
+    def _decode_dict(self):
+        ...
+
+    def _decode_string(self):
         ...
 
 
 class Encoder:
-    def __init__(self):
+    def __init__(self, data):
         ...
