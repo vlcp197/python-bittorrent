@@ -73,17 +73,32 @@ class Encoder:
     def __init__(self, data: Union[bytes, str, int, List, Dict]):
         self._data = data
 
-    def _encode_int(self):
+    def encode_data(self):
         ...
 
-    def _encode_string(self):
+    def encode_next_data(self):
         ...
 
-    def _encode_bytes(self):
-        ...
+    def _encode_int(self, value: int):
+        return str.encode(f'i{str(value)}e')
 
-    def _encode_list(self):
-        ...
+    def _encode_string(self, value: str):
+        res = f'{str(len(value))}:{value}'
+        return str.encode(res)
+
+    def _encode_bytes(self, value: str):
+        result = bytearray()
+        result += str.encode(str(len(value)))
+        result += b':'
+        result += value
+        return result
+
+    def _encode_list(self, data: List):
+        result = bytearray('8', 'utf-8')
+        result += b''.join([self.encode_next(item) for item in data])
+        result += b'e'
+        return result
 
     def _encode_dict(self):
-        ...
+        result = bytearray('d', 'utf-8')
+        return result
