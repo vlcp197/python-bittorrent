@@ -6,6 +6,7 @@
 # Exemple of a bencoded value: d4:name4:spam4:info12:length4:1234e .
 
 from collections import OrderedDict
+from typing import Union, List, Dict
 
 # Indicates start of integers
 TOKEN_INTEGER = b'i'
@@ -65,5 +66,24 @@ class Decoder:
 
 
 class Encoder:
-    def __init__(self, data):
+    """
+        Encodes a python object to a bencoded sequences of bytes.
+        Any other type will be simply ignored.
+    """
+    def __init__(self, data: Union[bytes, str, int, List, Dict]):
+        self._data = data
+
+    def _encode_int(self):
+        ...
+
+    def _encode_string(self):
+        ...
+
+    def _encode_bytes(self):
+        ...
+
+    def _encode_list(self):
+        ...
+
+    def _encode_dict(self):
         ...
