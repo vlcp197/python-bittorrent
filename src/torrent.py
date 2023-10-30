@@ -26,7 +26,7 @@ class Torrent:
 
     def _identify_files(self):
         """
-
+            Identifies if the file is multi-file or not.
         """
         if self.multi_file:
             raise RuntimeError("Multi-file torrents is not supported")
@@ -38,28 +38,32 @@ class Torrent:
     @property
     def announce(self) -> str:
         """
-
+            Returns the announce URL which is a web address that
+            BitTorrent client uses to communicate with a
+            BitTorrent Tracker
+            e.g. http://tracker.example.com/announce
         """
         return self.meta_info[b'announce'].decode('utf-8')
 
     @property
     def multi_file(self) -> bool:
         """
-
+            Checks if the torrent contains multiple files
         """
         return b'files' in self.meta_info[b'info']
 
     @property
     def piece_length(self) -> int:
         """
-
+            Get the length in bytes for each piece
         """
         return self.meta_info[b'info'][b'piece length']
 
     @property
     def total_size(self) -> int:
         """
-
+            The total size in bytes for all the files in
+            this torrent.
         """
         if self.multi_file:
             raise RuntimeError('Multi-file torrents is not supported!')
@@ -68,7 +72,7 @@ class Torrent:
     @property
     def pieces(self):
         """
-
+            String representing all pieces SHA1 hashes.
         """
         data = self.meta_info[b'info'][b'pieces']
         pieces = []
