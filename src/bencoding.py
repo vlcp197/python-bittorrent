@@ -35,6 +35,7 @@ class Decoder:
         self._data = data
         self._index = 0
 
+    @staticmethod
     def decode_data(self):
         """
             Decodes the bencoded data and return matching
@@ -109,6 +110,7 @@ class Encoder:
     def __init__(self, data: Union[bytes, str, int, List, Dict]):
         self._data = data
 
+    @staticmethod
     def encode_data(self) -> bytes:
         return self.encode_next_data(self._data)
 
