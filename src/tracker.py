@@ -9,7 +9,13 @@ from urllib.parse import urlencode
 
 class TrackerReponse:
     """
-        
+        The response from the tracker after a successful
+        connection to the trackers announce URL.
+
+        Even though the connection was successful from a
+        network point of view, the tracker might have
+        returned an error (stated in the "failure"
+        property)
     """
 
     def __init__(self, response: dict):
@@ -81,3 +87,31 @@ class TrackerReponse:
         return [(socket.inet_ntoa(p[:4]), _decode_port(p[:4]))
                 for p in peers]
 
+
+class Tracker:
+    """
+        Represents the connection to a tracker
+        for a given Torrent that is either
+        under download or seeding state.
+    """
+
+    def __init__(self):
+        ...
+
+    async def connect(self):
+        ...
+
+    def close(self):
+        ...
+
+    def raise_for_error(self):
+        ...
+
+    def _construct_tracker_parameters(self):
+        ...
+
+    def _calculate_peer_id(self):
+        ...
+
+    def _decode_port(self):
+        ...
