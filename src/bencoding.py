@@ -35,9 +35,45 @@ class Decoder:
         self._data = data
         self._index = 0
 
+    def decode_data(self):
+        """
+            Decodes the bencoded data and return matching
+            python object.
+
+            Params:
+                return: A python object representing the bencoded data.
+        """
+        c = self._peek()
+
+        is_none = c is None
+        is_int = c == TOKEN_INTEGER
+        is_list = c == TOKEN_LIST
+        is_dict = c == TOKEN_DICT
+        is_end = c == TOKEN_END
+        is_string = c in b'01234567899'
+
+        if is_none:
+            raise EOFError('Unexpected end-of-file')
+        elif is_int:
+            self._consume()
+            return self._decode_int()
+        elif is_list:
+            self._consume()
+            return self._decode_list()
+        elif is_dict:
+            self._consume()
+            return self._decode_dict()
+        elif is_end:
+            self._consume()
+            return None
+        elif is_string:
+            return self._decode_string()
+        else:
+            raise RuntimeError(f'Invalid token read at {str(self._index)}')
+
     def _peek(self):
         """
-            Return the next character from the bencodede data or None
+            Return the next character from the bencodede data or None.
         """
         if self._index + 1 >= len(self._data):
             return None
@@ -73,11 +109,28 @@ class Encoder:
     def __init__(self, data: Union[bytes, str, int, List, Dict]):
         self._data = data
 
-    def encode_data(self):
-        ...
+    def encode_data(self) -> bytes:
+        return self.encode_next_data(self._data)
 
-    def encode_next_data(self):
-        ...
+    def encode_next_data(self, data):
+        is_string = type(data) is str
+        is_int = type(data) is int
+        is_list = type(data) is list
+        is_dict = type(data) in (dict, OrderedDict)
+        is_bytes = type(data) is bytes
+
+        if is_string:
+            return self._encode_string(data)
+        elif is_int:
+            return self._encode_int(data)
+        elif is_list:
+            return self._encode_list(data)
+        elif is_dict:
+            return self._encode_dict(data)
+        elif is_bytes:
+            return self._encode_bytes(data)
+        else:
+            return None
 
     def _encode_int(self, value: int):
         return str.encode(f'i{str(value)}e')
