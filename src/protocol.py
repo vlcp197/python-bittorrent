@@ -42,7 +42,13 @@ class PeerConnection:
                  piece_manager,
                  on_block_cb=None):
         """
+            Constructs a PeerConnection and add it to the asyncio event-loop.
+
+            Use 'stop' to abort this connection and any subsequent connection
+            attempts
+
             Params:
+                queue: The async Queue containing available peers
                 info_hash: The SHA1 hash for the meta-data's info
                 peer_id: Our peer ID used to identify ourselves
                 piece_manager: The manager responsible to determine
@@ -149,7 +155,8 @@ class PeerConnection:
 
     def cancel(self):
         """
-
+            Sends the cancel message to the remote peer and closes the
+            connection.
         """
         logging.info(f'Closing peer {self.remote_id}')
         if not self.future.done():
@@ -161,7 +168,8 @@ class PeerConnection:
 
     def stop(self):
         """
-
+            Stop this connection from the current peer (if a connection exist)
+            and from connecting to any new peer.
         """
         self.my_state.append('stopped')
         if not self.future.done():
@@ -184,7 +192,8 @@ class PeerConnection:
 
     async def _handshake(self):
         """
-
+            Send the initial handshake to the remote peer and wait for the peer
+            to respond with its handshake.
         """
         self.writer.write(Handshake(self.info_hash, self.peer_id).encode())
         await self.writer.drain()
