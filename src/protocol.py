@@ -379,78 +379,142 @@ class PeerMessage:
 
 
 class Handshake(PeerMessage):
+    """
+    """
+    length = 49 + 19
 
+    def __init__(self, info_hash: bytes, peer_id: bytes):
+        """
 
-    def __init__(self):
-        ...
+        """
+        if isinstance(info_hash, str):
+            info_hash = info_hash.encode('utf-8')
+        if isinstance(peer_id, str):
+            peer_id = peer_id.encode('utf-8')
+        self.info_hash = info_hash
+        self.peer_id = peer_id
 
     def __str__(self):
-        ...
+        return 'Handshake'
 
     def encode(self) -> bytes:
-        ...
+        """
+
+        """
+        return struct.pack(
+            '>B19s8x20s20s',
+            19,
+            b'BitTorrent protocol',
+            self.info_hash,
+            self.peer_id)
 
     @classmethod
     def decode(cls, data: bytes):
-        ...
+        """
+
+        """
+        logging.debug(f'Decoding Handshake of length: {len(data)}')
+        if len(data) < (49 + 19):
+            return None
+        parts = struct.unpack('>B19s8x20s20s', data)
+        return cls(info_hash=parts[2], peer_id=parts[3])
 
 
 class KeepAlive(PeerMessage):
+    """
+
+    """
     def __str__(self):
-        ...
+        return 'KeepAlive'
 
 
 class BitField(PeerMessage):
-    def __init__(self):
-        ...
+    """
+
+    """
+    def __init__(self, data):
+        self.bitfield = bitstring.BitArray(bytes=data)
 
     def __str__(self):
-        ...
+        return "BitField"
 
     def encode(self) -> bytes:
-        ...
+        """
+
+        """
+        bits_length = len(self.bitfield)
+        return struct.pack(f'>Ib{str(bits_length)}s',
+                           1 + bits_length,
+                           PeerMessage.BITFIELD,
+                           self.bitfield)
 
     @classmethod
     def decode(cls, data: bytes):
-        ...
+        message_length = struct.unpack('>I', data[:4])[0]
+        logging.debug(f'Decoding BitField of length: {message_length}')
+
+        parts = struct.unpack(f'>Ib{str(message_length - 1)}s', data)
+        return cls(parts[2])
 
 
 class Interested(PeerMessage):
+    """
+
+    """
     def __str__(self):
-        ...
+        return 'Interested'
 
     def encode(self) -> bytes:
-        ...
+        """
+
+        """
+        return struct.pack('>Ib',
+                           1,
+                           PeerMessage.INTERESTED)
 
 
 class NotInterested(PeerMessage):
+    """
+
+    """
     def __str__(self):
-        ...
+        return 'NotInterested'
 
 
 class Choke(PeerMessage):
+    """
+
+    """
     def __str__(self):
-        ...
+        return 'Choke'
 
 
 class Unchoke(PeerMessage):
     def __str__(self):
-        ...
+        return 'Unchoke'
 
 
 class Have(PeerMessage):
-    def __init__(self):
-        ...
+    """
+
+    """
+    def __init__(self, index: int):
+        self.index = index
 
     def __str__(self):
-        ...
+        return "Have"
 
     def encode(self):
-        ...
+        return struct.pack('>IbI',
+                           5,
+                           PeerMessage.HAVE,
+                           self.index)
 
     @classmethod
-    def decode(cls):
-        ...
+    def decode(cls, data: bytes):
+        logging.debug(f'Decoding Have of length: {len(data)}')
+        index = struct.unpack('>IbI', data)[2]
+        return cls(index)
 
 
 class Request(PeerMessage):
@@ -458,7 +522,7 @@ class Request(PeerMessage):
         ...
 
     def __str__(self):
-        ...
+        return "Request"
 
     def encode(self):
         ...
