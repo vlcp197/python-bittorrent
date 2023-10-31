@@ -80,18 +80,18 @@ class PeerConnection:
                 await self._send_interested()
                 self.my_state.append('interested')
 
-                is_bitfield = isinstance(message, BitField)
-                is_interested = isinstance(message, Interested)
-                is_notinterested = isinstance(message, NotInterested)
-                is_choke = isinstance(message, Choke)
-                is_unchoke = isinstance(message, Unchoke)
-                is_have = isinstance(message, Have)
-                is_keepalive = isinstance(message, KeepAlive)
-                is_piece = isinstance(message, Piece)
-                is_request = isinstance(message, Request)
-                is_cancel = isinstance(message, Cancel)
-
                 async for message in PeerStreamIterator(self.reader, buffer):
+                    is_bitfield = isinstance(message, BitField)
+                    is_interested = isinstance(message, Interested)
+                    is_notinterested = isinstance(message, NotInterested)
+                    is_choke = isinstance(message, Choke)
+                    is_unchoke = isinstance(message, Unchoke)
+                    is_have = isinstance(message, Have)
+                    is_keepalive = isinstance(message, KeepAlive)
+                    is_piece = isinstance(message, Piece)
+                    is_request = isinstance(message, Request)
+                    is_cancel = isinstance(message, Cancel)
+
                     if 'stopped' in self.my_state:
                         break
                     if is_bitfield:
@@ -115,10 +115,10 @@ class PeerConnection:
                     elif is_piece:
                         self.my_state.remove('pending_request')
                         self.on_block_cb(
-                            peer_id = self.remote_id,
-                            piece_index = message.index,
-                            block_offset = message.begin,
-                            data = message.block)
+                            peer_id=self.remote_id,
+                            piece_index=message.index,
+                            block_offset=message.begin,
+                            data=message.block)
                     elif is_request:
                         logging.info('Ignoring the received Request message.')
                     elif is_cancel:
@@ -148,19 +148,69 @@ class PeerConnection:
             self.cancel()
 
     def cancel(self):
-        ...
+        """
+
+        """
+        logging.info(f'Closing peer {self.remote_id}')
+        if not self.future.done():
+            self.future.cancel()
+        if self.writer:
+            self.writer.close()
+
+        self.queue.task_done()
 
     def stop(self):
-        ...
+        """
+
+        """
+        self.my_state.append('stopped')
+        if not self.future.done():
+            self.future.cancel()
 
     async def _request_piece(self):
-        ...
+        block = self.piece_manager.next_request(self.remote_id)
+        if block:
+            message = Request(block.piece,
+                              block.offset,
+                              block.length).encode()
+            logging.debug(f"""
+                            Requesting block {block.piece}
+                            for piece {block.offset}
+                            of {block.length}
+                            bytes from peer {self.remote_id}
+                           """)
+            self.writer.write(message)
+            await self.writer.drain()
 
     async def _handshake(self):
-        ...
+        """
+
+        """
+        self.writer.write(Handshake(self.info_hash, self.peer_id).encode())
+        await self.writer.drain()
+
+        buf = b''
+        tries = 1
+        while len(buf) < Handshake.length and tries < 10:
+            tries += 1
+            buf = await self.reader.read(PeerStreamIterator.CHUNK_SIZE)
+
+        response = Handshake.decode(buf[:Handshake.length])
+        if not response:
+            raise ProtocolError('Unable receive and parse a handshake')
+        if not response.info_hash == self.info_hash:
+            raise ProtocolError('Handshake with invalid info_hash')
+
+        self.remote_id = response.peer_id
+        logging.info('Handshake with peer was successful')
+
+        return buf[Handshake.length:]
 
     async def _send_interested(self):
-        ...
+        message = Interested()
+        logging.debug(f'Sending message: {message}')
+        self.writer.write(message.encode())
+        await self.writer.drain()
 
 
 class PeerStreamIterator:
@@ -174,7 +224,7 @@ class PeerStreamIterator:
 
     async def __anext__(self):
         ...
-    
+
     def parse(self):
         ...
 
