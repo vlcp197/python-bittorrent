@@ -490,6 +490,9 @@ class Choke(PeerMessage):
 
 
 class Unchoke(PeerMessage):
+    """
+
+    """
     def __str__(self):
         return 'Unchoke'
 
@@ -518,45 +521,93 @@ class Have(PeerMessage):
 
 
 class Request(PeerMessage):
-    def __init__(self):
-        ...
+    """
+
+    """
+    def __init__(self, index: int, begin: int, length: int = REQUEST_SIZE):
+        """
+
+        """
+        self.index = index
+        self.begin = begin
+        self.length = length
 
     def __str__(self):
         return "Request"
 
     def encode(self):
-        ...
+        return struct.pack('>IbIII',
+                           13,
+                           PeerMessage.REQUEST,
+                           self.index,
+                           self.begin,
+                           self.length)
 
     @classmethod
-    def decode(cls):
-        ...
+    def decode(cls, data: bytes):
+        logging.debug(f'Decoding Request of length: {len(data)}')
+        parts = struct.unpack('>IbIII', data)
+        return cls(parts[2], parts[3], parts[4])
 
 
 class Piece(PeerMessage):
-    def __init__(self):
-        ...
+    """
+
+    """
+
+    length = 9
+
+    def __init__(self, index: int, begin: int, block: bytes):
+        """
+
+        """
+        self.index = index
+        self.begin = begin
+        self.block = block
 
     def __str__(self):
-        ...
+        return "Piece"
 
     def encode(self):
-        ...
+        message_length = Piece.length + len(self.block)
+        return struct.pack(f'>IbII{str(len(self.block))}s',
+                           message_length,
+                           PeerMessage.Piece,
+                           self.index,
+                           self.begin,
+                           self.block)
 
     @classmethod
-    def decode(cls):
-        ...
+    def decode(cls, data: bytes):
+        logging.debug(f'Decoding Piece of length: {len(data)}')
+        length = struct.unpack('>I', data[:4])[0]
+        parts = struct.unpack(f'>IbII{str(length - Piece.length)}s')
+        return cls(parts[2], parts[3], parts[4])
 
 
 class Cancel(PeerMessage):
-    def __init__(self):
-        ...
+    """
+
+    """
+
+    def __init__(self, index, begin, length: int = REQUEST_SIZE):
+        self.index = index
+        self.begin = begin
+        self.length = length
 
     def __str__(self):
-        ...
+        return "Cancel"
 
     def encode(self):
-        ...
+        return struct.pack('>IbIII',
+                           13,
+                           PeerMessage.CANCEL,
+                           self.index,
+                           self.begin,
+                           self.length)
 
     @classmethod
-    def decode(cls):
-        ...
+    def decode(cls, data: bytes):
+        logging.debug(f'Decoding cancel of length: {len(data)}')
+        parts = struct.unpack('>IbIII', data)
+        return cls(parts[2], parts[3], parts[4])
