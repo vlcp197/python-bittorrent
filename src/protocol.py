@@ -223,6 +223,14 @@ class PeerConnection:
 
 
 class PeerStreamIterator:
+    """
+        The 'PeerStreamIterator' is an async iterator that continuosly reads
+        from the given stream reader and tries to parse valid BitTorrent
+        messages from off that stream of bytes.
+
+        If the connection is dropped, something fails the iterator will abort
+        by raising the 'StopAsyncIteration' error ending the calling iteration.
+    """
     CHUNK_SIZE = 10*1024
 
     def __init__(self, reader, initial: bytes = None):
@@ -233,6 +241,10 @@ class PeerStreamIterator:
         return self
 
     async def __anext__(self):
+        """
+            Read data from the socket. When we have enough data to parse, parse
+            it and return the message. Until then keep reading from stream.
+        """
         while True:
             try:
                 data = await self.reader.read(self.CHUNK_SIZE)
@@ -269,9 +281,18 @@ class PeerStreamIterator:
                 return: The parsed message, or None if no message could be 
                 parsed.
         """
+        # Each message is structured as:
+        #   <length prefix><message ID><payload>
+        #
+        # The 'length prefix' is a four byte big-endian value
+        # The 'message ID' is a decimal byte
+        # The 'payload' is the value of 'length prefix'
+        #
+        # The message length is not part of the actual length. So another
+        # 4 bytes needs to be included when slicing the buffer.
         header_length = 4
 
-        if len(self.buffer) > 4:
+        if len(self.buffer) > 4:  # 4 bytes is needed to identify the message
             message_length = struct.unpack('>I', self.buffer[0:4])[0]
 
             if message_length == 0:
@@ -329,7 +350,7 @@ class PeerStreamIterator:
             else:
                 logging.debug('Not enough in buffer in order to parse.')
 
-        return None               
+        return None
 
 
 class PeerMessage:
@@ -361,31 +382,51 @@ class PeerMessage:
     PIECE = 7
     CANCEL = 8
     PORT = 9
-    HANDSHAKE = None
-    KEEPALIVE = None
+    HANDSHAKE = None  # Handshake is not really part of the messages
+    KEEPALIVE = None  # Keep-alive has no ID according to spec
 
     def encode(self) -> bytes:
         """
-
+            Encodes this object instance to the raw bytes representing the
+            entire message (ready to be transmitted).
         """
         pass
 
     @classmethod
     def decode(cls, data: bytes):
         """
-
+            Decodes the given BitTorrent message into a instance for the
+            implementing type.
         """
         pass
 
 
 class Handshake(PeerMessage):
     """
+        The handshake message is the first message sent and then received from
+        a remote peer.
+
+        The messages is always 68 bytes long (for this version of BitTorrent 
+        protocol).
+
+        Message format:
+            <pstrlen><pstr><reserved><info_hash><peer_id>
+
+        In version 1.0 of the BitTorrent protocol:
+            pstrlen = 19
+            pstr = "BitTorrent Protocol"
+
+        Thus length is:
+            49 + len(pstr) = 68 bytes long.
     """
     length = 49 + 19
 
     def __init__(self, info_hash: bytes, peer_id: bytes):
         """
-
+            Construct the handshake message
+            Params:
+                info_hash: The SHA1 hash for the info dict
+                peer_id: The unique peer id
         """
         if isinstance(info_hash, str):
             info_hash = info_hash.encode('utf-8')
@@ -399,7 +440,8 @@ class Handshake(PeerMessage):
 
     def encode(self) -> bytes:
         """
-
+            Encodes this object instance to the raw bytes representing the 
+            entire message (ready to be transmitted).
         """
         return struct.pack(
             '>B19s8x20s20s',
@@ -411,7 +453,8 @@ class Handshake(PeerMessage):
     @classmethod
     def decode(cls, data: bytes):
         """
-
+            Decodes the BitTorrent given message into a handshake message, if 
+            not a valid message, None is returned.
         """
         logging.debug(f'Decoding Handshake of length: {len(data)}')
         if len(data) < (49 + 19):
@@ -422,7 +465,10 @@ class Handshake(PeerMessage):
 
 class KeepAlive(PeerMessage):
     """
+        The Keep-Alive message has no payload and length is set to zero.
 
+        Message format:
+            <len=0000>
     """
     def __str__(self):
         return 'KeepAlive'
@@ -430,7 +476,12 @@ class KeepAlive(PeerMessage):
 
 class BitField(PeerMessage):
     """
+        The BitField is a message with variable length where the payload is a
+        bit array representing all the bits a peer have (1) or does not have
+        (0).
 
+        Message format:
+            <len=0001+X><id=5><bitfield>
     """
     def __init__(self, data):
         self.bitfield = bitstring.BitArray(bytes=data)
@@ -440,7 +491,8 @@ class BitField(PeerMessage):
 
     def encode(self) -> bytes:
         """
-
+            Encodes this object instance to the raw bytes representing the
+            entire message (ready to be transmitted).
         """
         bits_length = len(self.bitfield)
         return struct.pack(f'>Ib{str(bits_length)}s',
@@ -459,14 +511,20 @@ class BitField(PeerMessage):
 
 class Interested(PeerMessage):
     """
+        The interested message is fix length and has no payload other than the
+        message identifiers. It is used to notify each other about interest in
+        downloading pieces.
 
+        Message format:
+            <len=0001><id=2>
     """
     def __str__(self):
         return 'Interested'
 
     def encode(self) -> bytes:
         """
-
+            Encode this object instance to the raw bytes representing the
+            entire message (ready to be transmitted).
         """
         return struct.pack('>Ib',
                            1,
@@ -475,7 +533,12 @@ class Interested(PeerMessage):
 
 class NotInterested(PeerMessage):
     """
+        The not interested message is fix length and has no payload other than
+        the message identifier. It is used to notify each other that there is 
+        no interest to download pieces.
 
+        Message format:
+            <len=0001><id=3>
     """
     def __str__(self):
         return 'NotInterested'
@@ -483,7 +546,11 @@ class NotInterested(PeerMessage):
 
 class Choke(PeerMessage):
     """
+        The choke message is used to tell the other peer to stop send request
+        messages until unchoked.
 
+        Message format:
+            <len=0001><id=0> 
     """
     def __str__(self):
         return 'Choke'
@@ -491,7 +558,11 @@ class Choke(PeerMessage):
 
 class Unchoke(PeerMessage):
     """
+        Unchoking a peer enables that peer to start requesting pieces from the
+        remote peer.
 
+        Message format:
+            <len=0001><id=1>
     """
     def __str__(self):
         return 'Unchoke'
@@ -499,7 +570,8 @@ class Unchoke(PeerMessage):
 
 class Have(PeerMessage):
     """
-
+        Represents a piece successfully downloaded by the remote peer. The
+        piece is a zero based index of the torrents pieces.
     """
     def __init__(self, index: int):
         self.index = index
@@ -522,11 +594,23 @@ class Have(PeerMessage):
 
 class Request(PeerMessage):
     """
+        The message used to request a block of a piece (i.e. a partial piece).
 
+        The request size for each block is 2^14 bytes, except the final block
+        that might be smaller (since not all pieces might be evenly divided by
+        the request size).
+
+        Message format:
+            <len=0013><id=6><index><begin><length>
     """
     def __init__(self, index: int, begin: int, length: int = REQUEST_SIZE):
         """
+            Constructs the Request message.
 
+            Params:
+                index: The zero based piece index.
+                begin: The zero based offset within a piece.
+                length: The requested length of data (default 2^14).
         """
         self.index = index
         self.begin = begin
@@ -552,14 +636,28 @@ class Request(PeerMessage):
 
 class Piece(PeerMessage):
     """
+        A block is a part of a piece mentioned in the meta-info. The official
+        specification refer to them as pieces as well - which is quite
+        confusing.
+        The unofficial specification refers to them as block however.
 
+        So this class is named 'Piece' to match a message in the specification
+        but really, it represents a 'Block' (which is non-existent in the spec).
+
+        Message format:
+            <length prefix><message ID><index><begin><block>
     """
 
     length = 9
 
     def __init__(self, index: int, begin: int, block: bytes):
         """
+            Constructs the piece message.
 
+            Params:
+                index: The zero based piece index
+                begin: The zero based offset within a piece.
+                block: The block data.
         """
         self.index = index
         self.begin = begin
@@ -587,7 +685,12 @@ class Piece(PeerMessage):
 
 class Cancel(PeerMessage):
     """
+        The cancel message is used to cancel a previously requested block
+        (in fact the message is identical (besides from the id) to the Request
+        message).
 
+        Message format:
+            <len=0013><id=8><index><begin><length>
     """
 
     def __init__(self, index, begin, length: int = REQUEST_SIZE):
